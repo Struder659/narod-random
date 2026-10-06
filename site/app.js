@@ -36,7 +36,7 @@ button.addEventListener('click',async()=>{
   const id=++selection;
   previewController?.abort();
   if(!result.hidden && !previewStatus.hidden)previewStatus.textContent='';
-  message('Ищу живой сайт…');
+  message('Ищу сайт…');
   try {
     const response=await post('/api/random',{exclude:history.exclusions()},AbortSignal.timeout(55000));
     const site=await response.json();
