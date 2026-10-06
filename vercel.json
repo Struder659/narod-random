@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "fluid": true,
+  "buildCommand": "node scripts/build-api.mjs",
+  "outputDirectory": "public",
+  "functions": {
+    "api/random.js": {"maxDuration": 60},
+    "api/preview.js": {"maxDuration": 40, "includeFiles": "node_modules/@sparticuz/chromium/bin/**"},
+    "api/health.js": {"maxDuration": 10}
+  }
+}

@@ -3,8 +3,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: '23 */2 * * *'
 permissions:
   contents: read
 concurrency:
@@ -13,7 +11,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,11 +23,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-        env:
-          PREVIOUS_SITE_URL: https://struder659.github.io/narod-random/
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: dist-pages
   deploy:
     needs: build
     runs-on: ubuntu-latest

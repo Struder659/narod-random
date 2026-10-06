@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIndexHosts, parseBlock, inspectHTML, readPage } from '../lib/explorer.ts';
+import { parseIndexHosts, parseBlock, inspectHTML, readPage } from '../lib/explorer.mjs';
 
 test('one candidate per domain; only HTML narod.ru addresses survive index parsing', () => {
   const records = [

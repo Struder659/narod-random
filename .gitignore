@@ -4,3 +4,6 @@ site/previews/
 site/.nojekyll
 work/
 *.log
+.vercel/
+public/
+dist-pages/

@@ -1,7 +1,7 @@
 // Discover addresses from random Common Crawl index blocks; no fixed site list.
 // The bounded candidate pool, index metadata and cooldowns exist only in RAM.
 const blockedHosts = new Set(['www.narod.ru', 'narod.ru', 'www.www.narod.ru']);
-export function allowedURL(value: string, base?: string): URL | null {
+export function allowedURL(value        , base         )             {
   try {
     const url = new URL(value.replace(/&amp;/gi, '&'), base);
     if (!/^https?:$/.test(url.protocol) || url.port || url.username || url.password || url.href.length > 500) return null;
@@ -11,19 +11,19 @@ export function allowedURL(value: string, base?: string): URL | null {
     return url;
   } catch { return null; }
 }
-export const hostKey = (url: string) => new URL(url).hostname.replace(/^www\./, '');
-export function extractLinks(html: string, base: string): string[] {
-  const links = new Set<string>();
+export const hostKey = (url        ) => new URL(url).hostname.replace(/^www\./, '');
+export function extractLinks(html        , base        )           {
+  const links = new Set        ();
   for (const match of html.matchAll(/\b(?:href|src)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi)) {
     const url = allowedURL(match[1] || match[2] || match[3], base);
     if (url) links.add(url.href);
   }
   return [...links].slice(0, 250);
 }
-function clean(text: string) {
+function clean(text        ) {
   return text.replace(/<[^>]*>/g, ' ').replace(/&(?:nbsp|#160);/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#(\d+);/g, (_,n)=>String.fromCodePoint(Math.min(Number(n),0x10ffff))).replace(/\s+/g, ' ').trim();
 }
-export function inspectHTML(html: string) {
+export function inspectHTML(html        ) {
   const title = clean(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '').slice(0, 180);
   if (/сайт\s+(?:(?:временно|навсегда)\s+)?закрыт|(?:site|website)\s+(?:is\s+)?closed/i.test(title)) return null;
   const text = clean(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ''));
@@ -34,16 +34,16 @@ export function inspectHTML(html: string) {
   if (text.length < 60 && !/<frameset\b/i.test(html)) return null;
   return { title };
 }
-export async function readPage(input: string, timeout = 5500) {
+export async function readPage(input        , timeout = 5500) {
   let url = allowedURL(input);
   if (!url) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
     for (let redirects = 0; redirects < 4; redirects++) {
-      const response: Response = await fetch(url.href, { redirect:'manual', signal:controller.signal, headers:{ Accept:'text/html,application/xhtml+xml', 'User-Agent':'NarodWander/1.0 (link availability check)' } });
+      const response           = await fetch(url.href, { redirect:'manual', signal:controller.signal, headers:{ Accept:'text/html,application/xhtml+xml', 'User-Agent':'NarodWander/1.0 (link availability check)' } });
       if (response.status >= 300 && response.status < 400) {
-        const location: string | null = response.headers.get('location');
+        const location                = response.headers.get('location');
         await response.body?.cancel();
         url = location ? allowedURL(location, url.href) : null;
         if (!url) return null;
@@ -52,7 +52,7 @@ export async function readPage(input: string, timeout = 5500) {
       if (!response.ok || !/text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type') || '')) { await response.body?.cancel(); return null; }
       const reader = response.body?.getReader();
       if (!reader) return null;
-      const chunks: Uint8Array[] = []; let total = 0;
+      const chunks               = []; let total = 0;
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -66,7 +66,7 @@ export async function readPage(input: string, timeout = 5500) {
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
       const sample = new TextDecoder('latin1').decode(bytes.slice(0, 5000));
       const encoding = (response.headers.get('content-type') || '').match(/charset\s*=\s*["']?([\w-]+)/i)?.[1] || sample.match(/charset\s*=\s*["']?([\w-]+)/i)?.[1] || 'windows-1251';
-      let html: string;
+      let html        ;
       try { html = new TextDecoder(encoding).decode(bytes); } catch { html = new TextDecoder().decode(bytes); }
       const info = inspectHTML(html);
       return info ? { url:url.href, html, ...info } : null;
@@ -74,30 +74,30 @@ export async function readPage(input: string, timeout = 5500) {
     return null;
   } catch { return null; } finally { clearTimeout(timer); }
 }
-const candidates = new Map<string, string>();
-const cooldowns = new Map<string, number>();
+const candidates = new Map                ();
+const cooldowns = new Map                ();
 
 const USER_AGENT = 'NarodWander/2.0 (local old-web discovery prototype)';
-let indexState: { base: string; blocks: IndexBlock[]; expires: number; visited: Set<number> } | null = null;
-let discoveryInFlight: Promise<void> | null = null;
+let indexState                                                                                       = null;
+let discoveryInFlight                       = null;
 
 let retryDiscoveryAt = 0;
 
-export function randomIndex(length: number): number {
+export function randomIndex(length        )         {
   if (!Number.isSafeInteger(length) || length < 1 || length > 0x100000000) throw new Error('Invalid random range');
   const limit = Math.floor(0x100000000 / length) * length;
   const buffer = new Uint32Array(1);
   do { crypto.getRandomValues(buffer); } while (buffer[0] >= limit);
   return buffer[0] % length;
 }
-function shuffled<T>(values: T[]): T[] {
+function shuffled   (values     )      {
   for(let i=values.length-1;i>0;i--){ const j=randomIndex(i+1); [values[i],values[j]]=[values[j],values[i]]; }
   return values;
 }
 
 // Deduplicate by host BEFORE sampling: a site with 10,000 pages gets one entry.
-export function parseIndexHosts(text: string): Map<string, string> {
-  const hosts = new Map<string, string>();
+export function parseIndexHosts(text        )                      {
+  const hosts = new Map                ();
   for (const line of text.split('\n')) {
     try {
       const jsonStart = line.indexOf('{');
@@ -114,23 +114,23 @@ export function parseIndexHosts(text: string): Map<string, string> {
   return hosts;
 }
 
-async function limitedBytes(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array> {
-  const reader = stream.getReader(); const chunks: Uint8Array[]=[]; let total=0;
+async function limitedBytes(stream                            , limit        )                      {
+  const reader = stream.getReader(); const chunks              =[]; let total=0;
   try {
     while(true){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>limit){await reader.cancel();throw new Error('Index response too large');}chunks.push(value);}
   } finally {reader.releaseLock();}
   const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;
 }
 
-type IndexBlock = {file:string; offset:number; length:number};
-export function parseBlock(line: string): IndexBlock | null {
+                                                              
+export function parseBlock(line        )                    {
   const [,file,offsetText,lengthText]=line.split('\t');
   const offset=Number(offsetText),length=Number(lengthText);
   if(!/^cdx-\d{5}\.gz$/.test(file||'')||!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(length)||length<1||length>2_000_000) return null;
   return {file,offset,length};
 }
 
-async function indexResource(url: string, deadline:number, range?:{start:number;end:number}) {
+async function indexResource(url        , deadline       , range                           ) {
   const remaining=deadline-Date.now();if(remaining<=0)throw new Error('Index discovery timed out');
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.min(8000,remaining));
   try {
@@ -145,7 +145,7 @@ async function indexResource(url: string, deadline:number, range?:{start:number;
   } finally {clearTimeout(timer);}
 }
 
-async function locateBlocks(base:string,deadline:number):Promise<IndexBlock[]> {
+async function locateBlocks(base       ,deadline       )                       {
   // Binary search the sparse index with byte ranges; never download the full index.
   const file=base+'cluster.idx';const decoder=new TextDecoder('latin1');
   const first=await indexResource(file,deadline,{start:0,end:4095});
@@ -160,7 +160,7 @@ async function locateBlocks(base:string,deadline:number):Promise<IndexBlock[]> {
   }
   const start=Math.max(0,low-16384);let end=Math.min(first.total-1,high+131072);
   let text=decoder.decode((await indexResource(file,deadline,{start,end})).bytes);
-  while(text.slice(0,text.lastIndexOf('\n')).split('\n').at(-1)!.split('\t')[0]<'ru,narod-'&&end<first.total-1){
+  while(text.slice(0,text.lastIndexOf('\n')).split('\n').at(-1) .split('\t')[0]<'ru,narod-'&&end<first.total-1){
     if(text.length>500_000)throw new Error('Narod index section too large');
     const next=Math.min(first.total-1,end+65536);text+=decoder.decode((await indexResource(file,deadline,{start:end+1,end:next})).bytes);end=next;
   }
@@ -170,7 +170,7 @@ async function locateBlocks(base:string,deadline:number):Promise<IndexBlock[]> {
   const selected=rows.filter(row=>row.startsWith('ru,narod,'));
   // The preceding block can contain the first Narod records across its boundary.
   if(firstMatch>0)selected.unshift(rows[firstMatch-1]);
-  const blocks=selected.map(parseBlock).filter((block):block is IndexBlock=>block!==null);
+  const blocks=selected.map(parseBlock).filter((block)                    =>block!==null);
   if(!blocks.length)throw new Error('No valid index blocks');
   return blocks;
 }
@@ -179,7 +179,7 @@ async function discoverFromIndex() {
   const deadline=Date.now()+22_000;
   if(!indexState||indexState.expires<Date.now()){
     const metadata=await indexResource('https://index.commoncrawl.org/collinfo.json',deadline);
-    const records:unknown=JSON.parse(new TextDecoder().decode(metadata.bytes));
+    const records        =JSON.parse(new TextDecoder().decode(metadata.bytes));
     if(!Array.isArray(records))throw new Error('Invalid crawl metadata');
     const latest=records.find(record=>record&&typeof record.id==='string'&&/^CC-MAIN-\d{4}-\d{2}$/.test(record.id));
     if(!latest)throw new Error('No crawl index found');
@@ -191,12 +191,12 @@ async function discoverFromIndex() {
   const samples=candidates.size?1:3;let loaded=0;
   for(let attempt=0;attempt<samples+1;attempt++){
     if(indexState.visited.size>=indexState.blocks.length)indexState.visited.clear();
-    const available=indexState.blocks.map((_,i)=>i).filter(i=>!indexState!.visited.has(i));
+    const available=indexState.blocks.map((_,i)=>i).filter(i=>!indexState .visited.has(i));
     const chosen=available[randomIndex(available.length)];indexState.visited.add(chosen);
     const block=indexState.blocks[chosen];
     try {
       const compressed=await indexResource(indexState.base+block.file,deadline,{start:block.offset,end:block.offset+block.length-1});
-      const stream=new Response(new Uint8Array(compressed.bytes).buffer).body!.pipeThrough(new DecompressionStream('gzip'));
+      const stream=new Response(new Uint8Array(compressed.bytes).buffer).body .pipeThrough(new DecompressionStream('gzip'));
       const plain=new TextDecoder().decode(await limitedBytes(stream,8_000_000));
       const hosts=parseIndexHosts(plain);
       for(const [key,url] of hosts)candidates.set(key,url);
@@ -210,7 +210,7 @@ async function discoverFromIndex() {
 async function refreshCandidates() {
   if (discoveryInFlight) return discoveryInFlight;
   if (retryDiscoveryAt > Date.now()) return;
-  discoveryInFlight = discoverFromIndex().catch((error: unknown) => {
+  discoveryInFlight = discoverFromIndex().catch((error         ) => {
     console.warn('Narod index discovery:', error instanceof Error ? error.message : 'Unknown error');
     retryDiscoveryAt = Math.max(retryDiscoveryAt, Date.now()+30_000);
   }).finally(() => { discoveryInFlight = null; });
@@ -221,7 +221,7 @@ export class IndexUnavailableError extends Error {
   constructor(){super('Индекс временно не ответил. Попробуй ещё раз через полминуты.');}
 }
 
-export async function findRandom(exclude: string[]) {
+export async function findRandom(exclude          ) {
   const excluded = new Set(exclude.map(h=>h.replace(/^www\./,'')));
   await refreshCandidates();
   if (!candidates.size) {

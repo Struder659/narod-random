@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 import sharp from 'sharp';
 import { lookup } from 'node:dns/promises';
-import { allowedURL } from '../lib/explorer.ts';
+import { allowedURL } from '../lib/explorer.mjs';
 
 // A separate temporary profile; never connects to the user's browser.
 export function createPreviewRenderer({launch = () => chromium.launch({channel:'chrome', headless:true})} = {}) {
