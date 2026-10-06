@@ -1,0 +1,5 @@
+node_modules/
+site/data/
+site/previews/
+work/
+*.log

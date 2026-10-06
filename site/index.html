@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Случайные старые сайты narod.ru с превью.">
+  <meta name="referrer" content="no-referrer">
+  <title>Случайный Народ</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand-row"><span class="brand-gutter"></span><img class="brand-people" src="./narod/logo-top.gif" width="70" height="58" alt=""><div class="brand-name"><img src="./narod/narod.gif" width="102" height="37" alt="Народ"></div></div>
+    <div class="orange-bar"><span></span><img src="./narod/logo-bottom.gif" width="70" height="22" alt=""><h1 id="title">Случайный сайт</h1></div>
+  </header>
+  <main><section class="selection" aria-labelledby="title"><div class="content">
+    <button class="random-button" id="discover" type="button">Найти случайный сайт</button>
+    <p class="status" id="status" role="status" aria-live="polite" hidden></p>
+    <div class="result" id="result" hidden>
+      <div class="preview" id="preview" aria-busy="false"><a id="preview-link" target="_blank" rel="noopener noreferrer"><img id="thumbnail" width="320" height="240" alt=""></a><p id="preview-status" role="status" hidden></p></div>
+      <a class="site-url" id="site-url" target="_blank" rel="noopener noreferrer"></a>
+      <p id="site-title" hidden></p>
+      <p class="checked"><time id="checked"></time></p>
+    </div>
+    <noscript>Для случайного выбора включи JavaScript.</noscript>
+  </div></section></main>
+</body>
+</html>

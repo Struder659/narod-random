@@ -1,0 +1,36 @@
+
+:root{color-scheme:light;--background:#5843c2;--foreground:#000;--primary:#ffb000;--primary-foreground:#000;--ring:#340065}
+*{box-sizing:border-box}
+body{margin:0;background:#5843c2;color:#000;font:16px/1.4 "Times New Roman",Times,serif}
+img{display:block;max-width:none}
+.brand-row,.orange-bar{display:grid;grid-template-columns:24px 70px minmax(0,1fr)}
+.brand-row{height:58px;align-items:end}
+.brand-gutter{height:4px;background:#340065}
+.brand-people{align-self:end}
+.brand-name{height:41px;border-bottom:4px solid #340065}
+.orange-bar{min-height:26px;background:#ffb000;align-items:start}
+.orange-bar h1{font:700 16px/22px "Times New Roman",Times,serif;margin:0;padding:1px 12px}
+main{padding:65px 20px 60px}
+.selection{width:min(100%,620px);margin:0 auto}
+.content{padding:34px 30px 28px;background:#cbcbff;border-top:6px solid #9799fe;border-bottom:4px solid #3a297d}
+.random-button{display:flex;width:100%;height:auto;min-height:56px;padding:12px 18px;border:0;border-bottom:4px solid #3a297d;border-radius:0;background:#ffb000;color:#000;font:700 20px/1.25 "Times New Roman",Times,serif;text-decoration:underline;white-space:normal;cursor:pointer;box-shadow:none;transition:none}
+.random-button:hover{background:#ffc039;color:#000}
+.random-button:active{background:#eea400}
+.random-button:focus-visible{outline:2px solid #340065;outline-offset:4px;box-shadow:none}
+.random-button:disabled{opacity:1;background:#ffb000;color:#443457;cursor:wait;text-decoration:none}
+.status{margin:20px 0 0;min-height:45px;font-size:16px}
+.result{margin-top:18px;padding:20px 0 0;background:url('./narod/line.gif') repeat-x top left;overflow-wrap:anywhere}
+.result a{font-weight:bold;font-size:19px;color:#0000ff;text-decoration:underline}
+.result a:visited{color:#60008c}
+.result a:focus-visible{outline:2px solid #340065;outline-offset:3px}
+.result p{margin:8px 0 0;font-size:16px}
+.preview{width:100%;aspect-ratio:4/3;background:#9799fe;margin:0 0 14px;display:grid;place-items:center;overflow:hidden}
+.preview>a{display:block;width:100%;height:100%}
+.preview img{width:100%;height:100%;object-fit:contain;background:#fff;image-rendering:pixelated}
+.preview p{margin:0;padding:20px;text-align:center}
+.site-url{display:inline-block;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:440px){main{padding:40px 12px}.content{padding:27px 19px 21px}.brand-row,.orange-bar{grid-template-columns:12px 70px minmax(0,1fr)}}
+
+[hidden]{display:none!important}.random-button{justify-content:center;align-items:center}
+
+.result .checked{font-size:13px;color:#45376d}
