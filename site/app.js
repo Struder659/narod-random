@@ -1,4 +1,4 @@
-import {shuffle,validateCatalog} from './catalog.js';
+import {shuffle,validateCatalog,createHistory} from './catalog.js';
 const button=document.querySelector('#discover');
 const status=document.querySelector('#status');
 const result=document.querySelector('#result');
@@ -8,21 +8,29 @@ const previewStatus=document.querySelector('#preview-status');
 const siteLink=document.querySelector('#site-url');
 const siteTitle=document.querySelector('#site-title');
 const checked=document.querySelector('#checked');
-let catalogJob=null,sites=[],deck=[],currentURL=null;
+let catalogJob=null,sites=[],deck=[],loadedAt=0;
+const history=createHistory(()=>window.localStorage);
 function message(text){status.textContent=text;status.hidden=!text;}
 function loadCatalog(){
   return catalogJob ??= fetch('./data/sites.json',{cache:'no-cache',signal:AbortSignal.timeout(15000)})
     .then(response=>{if(!response.ok)throw new Error('Unavailable');return response.json();})
-    .then(data=>{sites=validateCatalog(data);deck=shuffle(sites);preload();})
-    .catch(error=>{catalogJob=null;throw error;});
+    .then(data=>{sites=validateCatalog(data);loadedAt=Date.now();deck=shuffle(history.unseen(sites));preload();})
+    .finally(()=>{catalogJob=null;});
 }
 function preload(){const next=deck.at(-1);if(next){const img=new Image();img.src='./'+next.preview;}}
 button.addEventListener('click',async()=>{
   button.disabled=true;
   try {
     if(!sites.length){message('Загружаю сайты…');await loadCatalog();}
-    if(!deck.length)deck=shuffle(sites,currentURL);
-    const site=deck.pop();currentURL=site.url;
+    deck=history.unseen(deck);
+    if(!deck.length || Date.now()-loadedAt>5*60*1000) {
+      message('Проверяю новые сайты…');await loadCatalog();
+    }
+    if(!deck.length) {
+      message('Все сайты из текущей подборки уже просмотрены. Новые появятся после обновления.');
+      button.textContent='Проверить новые сайты';return;
+    }
+    const site=deck.pop();history.remember(site);
     siteLink.href=site.url;siteLink.textContent=site.url;
     imageLink.href=site.url;imageLink.setAttribute('aria-label','Открыть '+site.url);
     image.alt='Превью '+new URL(site.url).hostname;

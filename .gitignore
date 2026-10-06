@@ -1,5 +1,6 @@
 node_modules/
 site/data/
 site/previews/
+site/.nojekyll
 work/
 *.log

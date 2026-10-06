@@ -21,7 +21,29 @@ export function validateCatalog(data) {
       if (!/^https?:$/.test(url.protocol) || url.port || url.username || url.password || !/^(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.narod\.ru$/.test(url.hostname) || key==='www.narod.ru' || !/^previews\/[a-f0-9]{16}\.jpg$/.test(site.preview) || !Number.isFinite(Date.parse(site.checkedAt)) || seen.has(key)) return false;
       seen.add(key); return true;
     } catch {return false;}
-  }).slice(0,500);
+  }).slice(0,1000);
   if (!sites.length) throw new Error('Empty catalog');
   return sites;
+}
+
+export function siteKey(url) { return new URL(url).hostname.replace(/^www\./,''); }
+
+export function createHistory(storage) {
+  const storageKey='narod-viewed-v1';
+  const seen=new Set();
+  function sync() {
+    try {
+      const saved=JSON.parse(storage()?.getItem(storageKey)||'[]');
+      if(Array.isArray(saved)) for(const key of saved) {
+        if(typeof key==='string' && /^[a-z0-9-]+\.narod\.ru$/.test(key)) seen.add(key);
+      }
+    } catch { /* Keep session history if browser storage is unavailable. */ }
+  }
+  return {
+    unseen(sites) { sync(); return sites.filter(site=>!seen.has(siteKey(site.url))); },
+    remember(site) {
+      sync(); seen.add(siteKey(site.url));
+      try { storage()?.setItem(storageKey,JSON.stringify([...seen])); } catch {}
+    }
+  };
 }
