@@ -130,12 +130,19 @@ export function parseBlock(line        )                    {
   return {file,offset,length};
 }
 
-async function indexResource(url        , deadline       , range                           ) {
+async function requestIndexResource(url, deadline, range) {
   const remaining=deadline-Date.now();if(remaining<=0)throw new Error('Index discovery timed out');
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.min(8000,remaining));
   try {
     const response=await fetch(url,{redirect:'manual',signal:controller.signal,headers:{'User-Agent':USER_AGENT,...(range?{Range:`bytes=${range.start}-${range.end}`}:{})}});
-    if(response.status!==(range?206:200)){await response.body?.cancel();throw new Error(`Index HTTP ${response.status}`);}
+    if(response.status!==(range?206:200)){
+      const retryAfter=response.headers.get('retry-after');
+      await response.body?.cancel();
+      const error=new Error(`Index HTTP ${response.status}: ${url}`);
+      error.retryable=[429,500,502,503,504].includes(response.status);
+      error.retryAfter=retryAfter ? (/^\d+$/.test(retryAfter) ? Number(retryAfter)*1000 : Math.max(0,Date.parse(retryAfter)-Date.now())) : 0;
+      throw error;
+    }
     const match=response.headers.get('content-range')?.match(/^bytes (\d+)-(\d+)\/(\d+)$/);
     const total=match?Number(match[3]):0;
     if(range&&(!match||Number(match[1])!==range.start||Number(match[2])>range.end||!Number.isSafeInteger(total))){await response.body?.cancel();throw new Error('Invalid index byte range');}
@@ -143,6 +150,26 @@ async function indexResource(url        , deadline       , range                
     const bytes=await limitedBytes(response.body,range?range.end-range.start+1:200_000);
     return {bytes,total};
   } finally {clearTimeout(timer);}
+}
+
+export async function indexResource(url, deadline, range) {
+  for(let attempt=0;;attempt++){
+    try {return await requestIndexResource(url,deadline,range);}
+    catch(error){
+      const retryable=error.retryable || error instanceof TypeError || error.name==='AbortError';
+      const delay=Math.max(1000*2**attempt,error.retryAfter||0);
+      if(!retryable || attempt>=2 || Date.now()+delay+250>=deadline)throw error;
+      await new Promise(resolve=>setTimeout(resolve,delay));
+    }
+  }
+}
+
+export function latestCollection(html) {
+  const ids=[...html.matchAll(/\bhref\s*=\s*(["'])\/crawl-data\/(CC-MAIN-\d{4}-\d{2})\/index\.html\1/gi)]
+    .map(match=>match[2]).filter(id=>Number(id.slice(-2))>=1 && Number(id.slice(-2))<=53);
+  const latest=ids.sort().at(-1);
+  if(!latest)throw new Error('No crawl index found in collection listing');
+  return latest;
 }
 
 async function locateBlocks(base       ,deadline       )                       {
@@ -178,12 +205,10 @@ async function locateBlocks(base       ,deadline       )                       {
 async function discoverFromIndex() {
   const deadline=Date.now()+22_000;
   if(!indexState||indexState.expires<Date.now()){
-    const metadata=await indexResource('https://index.commoncrawl.org/collinfo.json',deadline);
-    const records        =JSON.parse(new TextDecoder().decode(metadata.bytes));
-    if(!Array.isArray(records))throw new Error('Invalid crawl metadata');
-    const latest=records.find(record=>record&&typeof record.id==='string'&&/^CC-MAIN-\d{4}-\d{2}$/.test(record.id));
-    if(!latest)throw new Error('No crawl index found');
-    const base=`https://data.commoncrawl.org/cc-index/collections/${latest.id}/indexes/`;
+    // Use the official file listing, without depending on the rate-limited CDX API.
+    const metadata=await indexResource('https://data.commoncrawl.org/cc-index/collections/index.html',deadline);
+    const latest=latestCollection(new TextDecoder().decode(metadata.bytes));
+    const base=`https://data.commoncrawl.org/cc-index/collections/${latest}/indexes/`;
     const blocks=await locateBlocks(base,deadline);
     indexState={base,blocks,expires:Date.now()+12*60*60_000,visited:new Set()};
   }
@@ -218,7 +243,7 @@ async function refreshCandidates() {
 }
 
 export class IndexUnavailableError extends Error {
-  constructor(){super('Индекс временно не ответил. Попробуй ещё раз через полминуты.');}
+  constructor(){super('Источник адресов временно недоступен. Попробуй позже.');}
 }
 
 export async function findRandom(exclude          ) {

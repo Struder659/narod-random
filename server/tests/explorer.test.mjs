@@ -1,6 +1,47 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIndexHosts, parseBlock, inspectHTML, readPage } from '../lib/explorer.mjs';
+import { parseIndexHosts, parseBlock, inspectHTML, readPage, indexResource, latestCollection } from '../lib/explorer.mjs';
+
+test('official collection listing selects the latest crawl regardless of row order', () => {
+  assert.equal(latestCollection(`
+    <a href="/crawl-data/CC-MAIN-2025-51/index.html">older</a>
+    <a href='/crawl-data/CC-MAIN-2026-43/index.html'>newer</a>
+    <a href="/crawl-data/CC-MAIN-2026-39/index.html">older</a>
+    <a href="https://evil.example/crawl-data/CC-MAIN-9999-01/index.html">ignore</a>
+    <a href="/crawl-data/CC-MAIN-9999-99/index.html">invalid week</a>
+  `),'CC-MAIN-2026-43');
+  assert.throws(()=>latestCollection('<html>Service unavailable</html>'),/No crawl index/);
+});
+
+test('a temporary upstream 503 is retried and preserves the requested byte range', async () => {
+  const original=globalThis.fetch; const requests=[];
+  try {
+    globalThis.fetch=async (url,options)=>{
+      requests.push({url,range:options.headers.Range,time:Date.now()});
+      return requests.length===1 ? new Response('Unavailable',{status:503}) : new Response('test',{
+        status:206,headers:{'Content-Range':'bytes 20-23/100'}
+      });
+    };
+    const result=await indexResource('https://data.commoncrawl.org/test',Date.now()+5000,{start:20,end:23});
+    assert.equal(new TextDecoder().decode(result.bytes),'test');
+    assert.equal(result.total,100);
+    assert.equal(requests.length,2);
+    assert(requests[1].time-requests[0].time>=950,'retry must pause before repeating the upstream request');
+    assert(requests.every(request=>request.range==='bytes=20-23'));
+  } finally {globalThis.fetch=original;}
+});
+
+test('permanent errors and Retry-After beyond the deadline do not trigger more requests', async () => {
+  const original=globalThis.fetch;
+  try {
+    for(const status of [404,429]){
+      let calls=0;
+      globalThis.fetch=async ()=>{calls++;return new Response(null,{status,headers:{'Retry-After':'3600'}});};
+      await assert.rejects(indexResource('https://data.commoncrawl.org/test',Date.now()+5000),new RegExp(`HTTP ${status}`));
+      assert.equal(calls,1);
+    }
+  } finally {globalThis.fetch=original;}
+});
 
 test('one candidate per domain; only HTML narod.ru addresses survive index parsing', () => {
   const records = [
